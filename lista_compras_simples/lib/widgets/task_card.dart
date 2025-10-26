@@ -1,6 +1,9 @@
+// ignore_for_file: unused_local_variable
+
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../models/task.dart';
+// ignore: unused_import
 import '../models/category.dart';
 
 class TaskCard extends StatelessWidget {
