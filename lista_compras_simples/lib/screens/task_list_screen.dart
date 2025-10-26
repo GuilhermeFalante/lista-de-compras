@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../models/task.dart';
+import '../models/category.dart';
 import '../services/database_service.dart';
 import '../widgets/task_card.dart';
 import 'task_form_screen.dart';
@@ -15,6 +16,7 @@ class _TaskListScreenState extends State<TaskListScreen> {
   List<Task> _tasks = [];
   String _filter = 'all'; 
   String _sortBy = 'date'; 
+  String _categoryFilter = 'all'; 
   bool _isLoading = false;
 
   @override
@@ -29,6 +31,8 @@ class _TaskListScreenState extends State<TaskListScreen> {
     
     if (_sortBy == 'dueDate') {
       tasks = await DatabaseService.instance.readAllByDueDate();
+    } else if (_categoryFilter != 'all' && _categoryFilter != '') {
+      tasks = await DatabaseService.instance.readByCategory(_categoryFilter);
     } else {
       tasks = await DatabaseService.instance.readAll();
     }
@@ -50,7 +54,11 @@ class _TaskListScreenState extends State<TaskListScreen> {
         tasks = tasks.where((t) => !t.completed).toList();
         break;
     }
-
+    
+    if (_categoryFilter != 'all' && _sortBy != 'dueDate') {
+      tasks = tasks.where((t) => t.category.id == _categoryFilter).toList();
+    }
+    
     if (_sortBy != 'dueDate') {
       switch (_sortBy) {
         case 'priority':
@@ -61,6 +69,9 @@ class _TaskListScreenState extends State<TaskListScreen> {
             return orderA.compareTo(orderB);
           });
           break;
+        case 'category':
+          tasks.sort((a, b) => a.category.name.compareTo(b.category.name));
+          break;
         case 'date':
         default:
           tasks.sort((a, b) => b.createdAt.compareTo(a.createdAt));
@@ -69,7 +80,6 @@ class _TaskListScreenState extends State<TaskListScreen> {
     
     return tasks;
   }
-
   Future<void> _toggleTask(Task task) async {
     final updated = task.copyWith(completed: !task.completed);
     await DatabaseService.instance.update(updated);
@@ -77,7 +87,6 @@ class _TaskListScreenState extends State<TaskListScreen> {
   }
 
   Future<void> _deleteTask(Task task) async {
-    // Confirmar exclusão
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -125,6 +134,73 @@ class _TaskListScreenState extends State<TaskListScreen> {
     }
   }
 
+  Color _getCategoryColor(String colorHex) {
+    return Color(int.parse('0x$colorHex'));
+  }
+
+  Widget _buildCategoryChips() {
+    return Container(
+      height: 60,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: ListView(
+        scrollDirection: Axis.horizontal,
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: FilterChip(
+              selected: _categoryFilter == 'all',
+              label: const Text('Todas'),
+              onSelected: (selected) {
+                setState(() => _categoryFilter = 'all');
+                _loadTasks();
+              },
+              backgroundColor: Colors.grey.shade200,
+              selectedColor: Colors.blue,
+              labelStyle: TextStyle(
+                color: _categoryFilter == 'all' ? Colors.white : Colors.black,
+              ),
+            ),
+          ),
+          ...DefaultCategories.categories.map((category) {
+            return Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: FilterChip(
+                selected: _categoryFilter == category.id,
+                label: Text(category.name),
+                avatar: Container(
+                  padding: const EdgeInsets.all(2),
+                  decoration: BoxDecoration(
+                    color: _getCategoryColor(category.color),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    Icons.circle,
+                    color: _getCategoryColor(category.color),
+                    size: 16,
+                  ),
+                ),
+                onSelected: (selected) {
+                  setState(() => _categoryFilter = category.id);
+                  _loadTasks();
+                },
+                backgroundColor: Colors.grey.shade200,
+                selectedColor: _getCategoryColor(category.color).withOpacity(0.3),
+                labelStyle: TextStyle(
+                  color: _categoryFilter == category.id 
+                      ? _getCategoryColor(category.color) 
+                      : Colors.black,
+                  fontWeight: _categoryFilter == category.id 
+                      ? FontWeight.bold 
+                      : FontWeight.normal,
+                ),
+              ),
+            );
+          }).toList(),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final filteredTasks = _filteredTasks;
@@ -150,7 +226,7 @@ class _TaskListScreenState extends State<TaskListScreen> {
                   children: [
                     Icon(Icons.access_time),
                     SizedBox(width: 8),
-                    Text('Ordenar por Data de Criação'),
+                    Text('Data de Criação'),
                   ],
                 ),
               ),
@@ -160,7 +236,7 @@ class _TaskListScreenState extends State<TaskListScreen> {
                   children: [
                     Icon(Icons.event),
                     SizedBox(width: 8),
-                    Text('Ordenar por Data de Vencimento'),
+                    Text('Data de Vencimento'),
                   ],
                 ),
               ),
@@ -170,13 +246,23 @@ class _TaskListScreenState extends State<TaskListScreen> {
                   children: [
                     Icon(Icons.flag),
                     SizedBox(width: 8),
-                    Text('Ordenar por Prioridade'),
+                    Text('Prioridade'),
+                  ],
+                ),
+              ),
+              const PopupMenuItem(
+                value: 'category',
+                child: Row(
+                  children: [
+                    Icon(Icons.category),
+                    SizedBox(width: 8),
+                    Text('Categoria'),
                   ],
                 ),
               ),
             ],
           ),
-          // Filtro
+          // Filtro de Status
           PopupMenuButton<String>(
             icon: const Icon(Icons.filter_list),
             onSelected: (value) => setState(() => _filter = value),
@@ -218,7 +304,7 @@ class _TaskListScreenState extends State<TaskListScreen> {
       
       body: Column(
         children: [
-          // Card de Estatísticas
+          _buildCategoryChips(),
           if (_tasks.isNotEmpty)
             Container(
               margin: const EdgeInsets.all(16),
@@ -329,18 +415,27 @@ class _TaskListScreenState extends State<TaskListScreen> {
     String message;
     IconData icon;
     
-    switch (_filter) {
-      case 'completed':
-        message = 'Nenhuma tarefa concluída ainda';
-        icon = Icons.check_circle_outline;
-        break;
-      case 'pending':
-        message = 'Nenhuma tarefa pendente';
-        icon = Icons.pending_actions;
-        break;
-      default:
-        message = 'Nenhuma tarefa cadastrada';
-        icon = Icons.task_alt;
+    if (_categoryFilter != 'all') {
+      final category = DefaultCategories.categories.firstWhere(
+        (c) => c.id == _categoryFilter,
+        orElse: () => DefaultCategories.defaultCategory,
+      );
+      message = 'Nenhuma tarefa na categoria ${category.name}';
+      icon = Icons.category;
+    } else {
+      switch (_filter) {
+        case 'completed':
+          message = 'Nenhuma tarefa concluída ainda';
+          icon = Icons.check_circle_outline;
+          break;
+        case 'pending':
+          message = 'Nenhuma tarefa pendente';
+          icon = Icons.pending_actions;
+          break;
+        default:
+          message = 'Nenhuma tarefa cadastrada';
+          icon = Icons.task_alt;
+      }
     }
     
     return Center(
@@ -355,6 +450,7 @@ class _TaskListScreenState extends State<TaskListScreen> {
               fontSize: 18,
               color: Colors.grey.shade600,
             ),
+            textAlign: TextAlign.center,
           ),
           const SizedBox(height: 8),
           TextButton.icon(
@@ -368,15 +464,18 @@ class _TaskListScreenState extends State<TaskListScreen> {
   }
 
   Map<String, int> _calculateStats() {
-    // ignore: unused_local_variable
     final now = DateTime.now();
-    final overdueCount = _tasks.where((t) => t.isOverdue).length;
-    final dueTodayCount = _tasks.where((t) => t.isDueToday && !t.completed).length;
+    final filteredTasks = _categoryFilter == 'all' 
+        ? _tasks 
+        : _tasks.where((t) => t.category.id == _categoryFilter).toList();
+    
+    final overdueCount = filteredTasks.where((t) => t.isOverdue).length;
+    final dueTodayCount = filteredTasks.where((t) => t.isDueToday && !t.completed).length;
     
     return {
-      'total': _tasks.length,
-      'completed': _tasks.where((t) => t.completed).length,
-      'pending': _tasks.where((t) => !t.completed).length,
+      'total': filteredTasks.length,
+      'completed': filteredTasks.where((t) => t.completed).length,
+      'pending': filteredTasks.where((t) => !t.completed).length,
       'overdue': overdueCount,
       'dueToday': dueTodayCount,
     };

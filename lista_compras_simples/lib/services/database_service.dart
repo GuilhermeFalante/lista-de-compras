@@ -1,6 +1,7 @@
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
 import '../models/task.dart';
+import '../models/category.dart';
 
 class DatabaseService {
   static final DatabaseService instance = DatabaseService._init();
@@ -20,9 +21,9 @@ class DatabaseService {
 
     return await openDatabase(
       path,
-      version: 2, 
+      version: 3, 
       onCreate: _createDB,
-      onUpgrade: _upgradeDB, 
+      onUpgrade: _upgradeDB,
     );
   }
 
@@ -35,7 +36,8 @@ class DatabaseService {
         completed INTEGER NOT NULL,
         priority TEXT NOT NULL,
         createdAt TEXT NOT NULL,
-        dueDate TEXT -- NOVA COLUNA
+        dueDate TEXT,
+        categoryId TEXT NOT NULL -- NOVA COLUNA
       )
     ''');
   }
@@ -43,6 +45,10 @@ class DatabaseService {
   Future<void> _upgradeDB(Database db, int oldVersion, int newVersion) async {
     if (oldVersion < 2) {
       await db.execute('ALTER TABLE tasks ADD COLUMN dueDate TEXT');
+    }
+    if (oldVersion < 3) {
+      await db.execute('ALTER TABLE tasks ADD COLUMN categoryId TEXT');
+      await db.update('tasks', {'categoryId': 'personal'});
     }
   }
 
@@ -70,6 +76,17 @@ class DatabaseService {
     final db = await database;
     const orderBy = 'createdAt DESC';
     final result = await db.query('tasks', orderBy: orderBy);
+    return result.map((map) => Task.fromMap(map)).toList();
+  }
+
+  Future<List<Task>> readByCategory(String categoryId) async {
+    final db = await database;
+    final result = await db.query(
+      'tasks',
+      where: 'categoryId = ?',
+      whereArgs: [categoryId],
+      orderBy: 'createdAt DESC',
+    );
     return result.map((map) => Task.fromMap(map)).toList();
   }
 
@@ -102,5 +119,26 @@ class DatabaseService {
       where: 'id = ?',
       whereArgs: [id],
     );
+  }
+
+  Future<Map<String, int>> getCategoryStats() async {
+    final db = await database;
+    final result = await db.rawQuery('''
+      SELECT categoryId, COUNT(*) as count 
+      FROM tasks 
+      WHERE completed = 0 
+      GROUP BY categoryId
+    ''');
+
+    final stats = <String, int>{};
+    for (final map in result) {
+      stats[map['categoryId'] as String] = map['count'] as int;
+    }
+
+    for (final category in DefaultCategories.categories) {
+      stats.putIfAbsent(category.id, () => 0);
+    }
+
+    return stats;
   }
 }

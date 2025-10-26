@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../models/task.dart';
+import '../models/category.dart';
 import '../services/database_service.dart';
 
 class TaskFormScreen extends StatefulWidget {
-  final Task? task; 
+  final Task? task;
 
   const TaskFormScreen({super.key, this.task});
 
@@ -21,6 +22,7 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
   bool _completed = false;
   bool _isLoading = false;
   DateTime? _dueDate;
+  Category _selectedCategory = DefaultCategories.defaultCategory;
 
   @override
   void initState() {
@@ -32,6 +34,7 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
       _priority = widget.task!.priority;
       _completed = widget.task!.completed;
       _dueDate = widget.task!.dueDate;
+      _selectedCategory = widget.task!.category;
     }
   }
 
@@ -80,6 +83,23 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
     });
   }
 
+  Color _getCategoryColor(String colorHex) {
+    return Color(int.parse('0x$colorHex'));
+  }
+
+  IconData _getCategoryIcon(String iconName) {
+    switch (iconName) {
+      case 'work': return Icons.work;
+      case 'person': return Icons.person;
+      case 'school': return Icons.school;
+      case 'favorite': return Icons.favorite;
+      case 'shopping_cart': return Icons.shopping_cart;
+      case 'home': return Icons.home;
+      case 'category': return Icons.category;
+      default: return Icons.category;
+    }
+  }
+
   Future<void> _saveTask() async {
     if (!_formKey.currentState!.validate()) {
       return;
@@ -95,6 +115,7 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
           priority: _priority,
           completed: _completed,
           dueDate: _dueDate,
+          category: _selectedCategory, 
         );
         await DatabaseService.instance.create(newTask);
         
@@ -114,6 +135,7 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
           priority: _priority,
           completed: _completed,
           dueDate: _dueDate,
+          category: _selectedCategory,
         );
         await DatabaseService.instance.update(updatedTask);
         
@@ -129,7 +151,7 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
       }
 
       if (mounted) {
-        Navigator.pop(context, true); // Retorna true = sucesso
+        Navigator.pop(context, true);
       }
     } catch (e) {
       if (mounted) {
@@ -205,7 +227,47 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
                     ),
                     
                     const SizedBox(height: 16),
+
+                    DropdownButtonFormField<Category>(
+                      value: _selectedCategory,
+                      decoration: const InputDecoration(
+                        labelText: 'Categoria',
+                        prefixIcon: Icon(Icons.category),
+                        border: OutlineInputBorder(),
+                      ),
+                      items: DefaultCategories.categories.map((category) {
+                        return DropdownMenuItem<Category>(
+                          value: category,
+                          child: Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(4),
+                                decoration: BoxDecoration(
+                                  color: _getCategoryColor(category.color),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: Icon(
+                                  _getCategoryIcon(category.icon),
+                                  color: Colors.white,
+                                  size: 16,
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Text(category.name),
+                            ],
+                          ),
+                        );
+                      }).toList(),
+                      onChanged: (category) {
+                        if (category != null) {
+                          setState(() => _selectedCategory = category);
+                        }
+                      },
+                    ),
                     
+                    const SizedBox(height: 16),
+                    
+                    // Dropdown de Prioridade
                     DropdownButtonFormField<String>(
                       value: _priority,
                       decoration: const InputDecoration(

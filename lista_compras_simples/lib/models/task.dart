@@ -1,4 +1,5 @@
 import 'package:uuid/uuid.dart';
+import 'category.dart';
 
 class Task {
   final String id;
@@ -7,7 +8,8 @@ class Task {
   final bool completed;
   final String priority;
   final DateTime createdAt;
-  final DateTime? dueDate; 
+  final DateTime? dueDate;
+  final Category category; 
 
   Task({
     String? id,
@@ -16,9 +18,11 @@ class Task {
     this.completed = false,
     this.priority = 'medium',
     DateTime? createdAt,
-    this.dueDate, // NOVO PARÂMETRO
+    this.dueDate,
+    Category? category,
   })  : id = id ?? const Uuid().v4(),
-        createdAt = createdAt ?? DateTime.now();
+        createdAt = createdAt ?? DateTime.now(),
+        category = category ?? DefaultCategories.defaultCategory;
 
   Map<String, dynamic> toMap() {
     return {
@@ -28,11 +32,19 @@ class Task {
       'completed': completed ? 1 : 0,
       'priority': priority,
       'createdAt': createdAt.toIso8601String(),
-      'dueDate': dueDate?.toIso8601String(), 
+      'dueDate': dueDate?.toIso8601String(),
+      'categoryId': category.id, 
     };
   }
 
   factory Task.fromMap(Map<String, dynamic> map) {
+
+    final categoryId = map['categoryId'] ?? 'personal';
+    final category = DefaultCategories.categories.firstWhere(
+      (c) => c.id == categoryId,
+      orElse: () => DefaultCategories.defaultCategory,
+    );
+
     return Task(
       id: map['id'],
       title: map['title'],
@@ -40,7 +52,8 @@ class Task {
       completed: map['completed'] == 1,
       priority: map['priority'] ?? 'medium',
       createdAt: DateTime.parse(map['createdAt']),
-      dueDate: map['dueDate'] != null ? DateTime.parse(map['dueDate']) : null, 
+      dueDate: map['dueDate'] != null ? DateTime.parse(map['dueDate']) : null,
+      category: category, 
     );
   }
 
@@ -50,6 +63,7 @@ class Task {
     bool? completed,
     String? priority,
     DateTime? dueDate,
+    Category? category, 
   }) {
     return Task(
       id: id,
@@ -58,7 +72,8 @@ class Task {
       completed: completed ?? this.completed,
       priority: priority ?? this.priority,
       createdAt: createdAt,
-      dueDate: dueDate ?? this.dueDate, 
+      dueDate: dueDate ?? this.dueDate,
+      category: category ?? this.category,
     );
   }
 

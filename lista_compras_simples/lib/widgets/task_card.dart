@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../models/task.dart';
+import '../models/category.dart';
 
 class TaskCard extends StatelessWidget {
   final Task task;
@@ -55,10 +56,59 @@ class TaskCard extends StatelessWidget {
     }
   }
 
+  Color _getCategoryColor(String colorHex) {
+    return Color(int.parse('0x$colorHex'));
+  }
+
+  IconData _getCategoryIcon(String iconName) {
+    switch (iconName) {
+      case 'work': return Icons.work;
+      case 'person': return Icons.person;
+      case 'school': return Icons.school;
+      case 'favorite': return Icons.favorite;
+      case 'shopping_cart': return Icons.shopping_cart;
+      case 'home': return Icons.home;
+      case 'category': return Icons.category;
+      default: return Icons.category;
+    }
+  }
+
+  Widget _buildCategoryBadge() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: _getCategoryColor(task.category.color).withOpacity(0.1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: _getCategoryColor(task.category.color),
+          width: 1,
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            _getCategoryIcon(task.category.icon),
+            size: 12,
+            color: _getCategoryColor(task.category.color),
+          ),
+          const SizedBox(width: 4),
+          Text(
+            task.category.name,
+            style: TextStyle(
+              fontSize: 10,
+              color: _getCategoryColor(task.category.color),
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildDueDateInfo() {
     if (task.dueDate == null) return const SizedBox.shrink();
     
-    // ignore: unused_local_variable
     final now = DateTime.now();
     final dueDate = task.dueDate!;
     final isOverdue = task.isOverdue;
@@ -118,7 +168,7 @@ class TaskCard extends StatelessWidget {
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
         side: BorderSide(
-          color: task.completed ? Colors.grey.shade300 : _getPriorityColor(),
+          color: task.completed ? Colors.grey.shade300 : _getCategoryColor(task.category.color),
           width: 2,
         ),
       ),
@@ -185,6 +235,8 @@ class TaskCard extends StatelessWidget {
                     // Metadata Row
                     Row(
                       children: [
+                        _buildCategoryBadge(),
+                        const SizedBox(width: 8),
                         // Prioridade
                         Container(
                           padding: const EdgeInsets.symmetric(
@@ -203,14 +255,14 @@ class TaskCard extends StatelessWidget {
                             children: [
                               Icon(
                                 _getPriorityIcon(),
-                                size: 14,
+                                size: 12,
                                 color: _getPriorityColor(),
                               ),
                               const SizedBox(width: 4),
                               Text(
                                 _getPriorityLabel(),
                                 style: TextStyle(
-                                  fontSize: 12,
+                                  fontSize: 10,
                                   color: _getPriorityColor(),
                                   fontWeight: FontWeight.bold,
                                 ),
@@ -219,19 +271,19 @@ class TaskCard extends StatelessWidget {
                           ),
                         ),
                         
-                        const SizedBox(width: 12),
+                        const SizedBox(width: 8),
                         
                         // Data
                         Icon(
                           Icons.access_time,
-                          size: 14,
+                          size: 12,
                           color: Colors.grey.shade600,
                         ),
                         const SizedBox(width: 4),
                         Text(
-                          dateFormat.format(task.createdAt),
+                          DateFormat('dd/MM/yy').format(task.createdAt),
                           style: TextStyle(
-                            fontSize: 12,
+                            fontSize: 10,
                             color: Colors.grey.shade600,
                           ),
                         ),
