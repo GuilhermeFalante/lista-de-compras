@@ -20,8 +20,9 @@ class DatabaseService {
 
     return await openDatabase(
       path,
-      version: 1,
+      version: 2, 
       onCreate: _createDB,
+      onUpgrade: _upgradeDB, 
     );
   }
 
@@ -33,9 +34,16 @@ class DatabaseService {
         description TEXT,
         completed INTEGER NOT NULL,
         priority TEXT NOT NULL,
-        createdAt TEXT NOT NULL
+        createdAt TEXT NOT NULL,
+        dueDate TEXT -- NOVA COLUNA
       )
     ''');
+  }
+
+  Future<void> _upgradeDB(Database db, int oldVersion, int newVersion) async {
+    if (oldVersion < 2) {
+      await db.execute('ALTER TABLE tasks ADD COLUMN dueDate TEXT');
+    }
   }
 
   Future<Task> create(Task task) async {
@@ -62,6 +70,18 @@ class DatabaseService {
     final db = await database;
     const orderBy = 'createdAt DESC';
     final result = await db.query('tasks', orderBy: orderBy);
+    return result.map((map) => Task.fromMap(map)).toList();
+  }
+
+  Future<List<Task>> readAllByDueDate() async {
+    final db = await database;
+    final result = await db.rawQuery('''
+      SELECT * FROM tasks 
+      ORDER BY 
+        CASE WHEN dueDate IS NULL THEN 1 ELSE 0 END,
+        dueDate ASC,
+        createdAt DESC
+    ''');
     return result.map((map) => Task.fromMap(map)).toList();
   }
 

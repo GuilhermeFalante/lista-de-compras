@@ -13,7 +13,8 @@ class TaskListScreen extends StatefulWidget {
 
 class _TaskListScreenState extends State<TaskListScreen> {
   List<Task> _tasks = [];
-  String _filter = 'all'; // all, completed, pending
+  String _filter = 'all'; 
+  String _sortBy = 'date'; 
   bool _isLoading = false;
 
   @override
@@ -24,7 +25,14 @@ class _TaskListScreenState extends State<TaskListScreen> {
 
   Future<void> _loadTasks() async {
     setState(() => _isLoading = true);
-    final tasks = await DatabaseService.instance.readAll();
+    List<Task> tasks;
+    
+    if (_sortBy == 'dueDate') {
+      tasks = await DatabaseService.instance.readAllByDueDate();
+    } else {
+      tasks = await DatabaseService.instance.readAll();
+    }
+    
     setState(() {
       _tasks = tasks;
       _isLoading = false;
@@ -32,14 +40,34 @@ class _TaskListScreenState extends State<TaskListScreen> {
   }
 
   List<Task> get _filteredTasks {
+    var tasks = _tasks;
+    
     switch (_filter) {
       case 'completed':
-        return _tasks.where((t) => t.completed).toList();
+        tasks = tasks.where((t) => t.completed).toList();
+        break;
       case 'pending':
-        return _tasks.where((t) => !t.completed).toList();
-      default:
-        return _tasks;
+        tasks = tasks.where((t) => !t.completed).toList();
+        break;
     }
+
+    if (_sortBy != 'dueDate') {
+      switch (_sortBy) {
+        case 'priority':
+          final priorityOrder = {'urgent': 0, 'high': 1, 'medium': 2, 'low': 3};
+          tasks.sort((a, b) {
+            final orderA = priorityOrder[a.priority] ?? 2;
+            final orderB = priorityOrder[b.priority] ?? 2;
+            return orderA.compareTo(orderB);
+          });
+          break;
+        case 'date':
+        default:
+          tasks.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      }
+    }
+    
+    return tasks;
   }
 
   Future<void> _toggleTask(Task task) async {
@@ -109,6 +137,45 @@ class _TaskListScreenState extends State<TaskListScreen> {
         foregroundColor: Colors.white,
         elevation: 2,
         actions: [
+          PopupMenuButton<String>(
+            icon: const Icon(Icons.sort),
+            onSelected: (value) {
+              setState(() => _sortBy = value);
+              _loadTasks();
+            },
+            itemBuilder: (context) => [
+              const PopupMenuItem(
+                value: 'date',
+                child: Row(
+                  children: [
+                    Icon(Icons.access_time),
+                    SizedBox(width: 8),
+                    Text('Ordenar por Data de Criação'),
+                  ],
+                ),
+              ),
+              const PopupMenuItem(
+                value: 'dueDate',
+                child: Row(
+                  children: [
+                    Icon(Icons.event),
+                    SizedBox(width: 8),
+                    Text('Ordenar por Data de Vencimento'),
+                  ],
+                ),
+              ),
+              const PopupMenuItem(
+                value: 'priority',
+                child: Row(
+                  children: [
+                    Icon(Icons.flag),
+                    SizedBox(width: 8),
+                    Text('Ordenar por Prioridade'),
+                  ],
+                ),
+              ),
+            ],
+          ),
           // Filtro
           PopupMenuButton<String>(
             icon: const Icon(Icons.filter_list),
@@ -170,24 +237,27 @@ class _TaskListScreenState extends State<TaskListScreen> {
                   ),
                 ],
               ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceAround,
+              child: Column(
                 children: [
-                  _buildStatItem(
-                    Icons.list,
-                    'Total',
-                    stats['total'].toString(),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceAround,
+                    children: [
+                      _buildStatItem(Icons.list, 'Total', stats['total'].toString()),
+                      _buildStatItem(Icons.pending_actions, 'Pendentes', stats['pending'].toString()),
+                      _buildStatItem(Icons.check_circle, 'Concluídas', stats['completed'].toString()),
+                    ],
                   ),
-                  _buildStatItem(
-                    Icons.pending_actions,
-                    'Pendentes',
-                    stats['pending'].toString(),
-                  ),
-                  _buildStatItem(
-                    Icons.check_circle,
-                    'Concluídas',
-                    stats['completed'].toString(),
-                  ),
+                  const SizedBox(height: 8),
+                  if (stats['overdue']! > 0 || stats['dueToday']! > 0)
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceAround,
+                      children: [
+                        if (stats['overdue']! > 0)
+                          _buildStatItem(Icons.warning, 'Vencidas', stats['overdue'].toString(), color: Colors.red.shade100),
+                        if (stats['dueToday']! > 0)
+                          _buildStatItem(Icons.today, 'Hoje', stats['dueToday'].toString(), color: Colors.orange.shade100),
+                      ],
+                    ),
                 ],
               ),
             ),
@@ -228,24 +298,26 @@ class _TaskListScreenState extends State<TaskListScreen> {
     );
   }
 
-  Widget _buildStatItem(IconData icon, String label, String value) {
+  Widget _buildStatItem(IconData icon, String label, String value, {Color? color}) {
+    final iconColor = color ?? Colors.white;
+    final textColor = color ?? Colors.white;
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(icon, color: Colors.white, size: 32),
+        Icon(icon, color: iconColor, size: 28),
         const SizedBox(height: 4),
         Text(
           value,
-          style: const TextStyle(
-            color: Colors.white,
-            fontSize: 24,
+          style: TextStyle(
+            color: textColor,
+            fontSize: 20,
             fontWeight: FontWeight.bold,
           ),
         ),
         Text(
           label,
-          style: const TextStyle(
-            color: Colors.white70,
+          style: TextStyle(
+            color: textColor.withOpacity(0.9),
             fontSize: 12,
           ),
         ),
@@ -296,10 +368,17 @@ class _TaskListScreenState extends State<TaskListScreen> {
   }
 
   Map<String, int> _calculateStats() {
+    // ignore: unused_local_variable
+    final now = DateTime.now();
+    final overdueCount = _tasks.where((t) => t.isOverdue).length;
+    final dueTodayCount = _tasks.where((t) => t.isDueToday && !t.completed).length;
+    
     return {
       'total': _tasks.length,
       'completed': _tasks.where((t) => t.completed).length,
       'pending': _tasks.where((t) => !t.completed).length,
+      'overdue': overdueCount,
+      'dueToday': dueTodayCount,
     };
   }
 }

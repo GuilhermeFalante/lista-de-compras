@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import '../models/task.dart';
 import '../services/database_service.dart';
 
 class TaskFormScreen extends StatefulWidget {
-  final Task? task; // null = criar novo, não-null = editar
+  final Task? task; 
 
   const TaskFormScreen({super.key, this.task});
 
@@ -19,17 +20,18 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
   String _priority = 'medium';
   bool _completed = false;
   bool _isLoading = false;
+  DateTime? _dueDate;
 
   @override
   void initState() {
     super.initState();
     
-    // Se estiver editando, preencher campos
     if (widget.task != null) {
       _titleController.text = widget.task!.title;
       _descriptionController.text = widget.task!.description;
       _priority = widget.task!.priority;
       _completed = widget.task!.completed;
+      _dueDate = widget.task!.dueDate;
     }
   }
 
@@ -38,6 +40,44 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
     _titleController.dispose();
     _descriptionController.dispose();
     super.dispose();
+  }
+
+  Future<void> _selectDueDate() async {
+    final DateTime? picked = await showDatePicker(
+      context: context,
+      initialDate: _dueDate ?? DateTime.now(),
+      firstDate: DateTime(2000),
+      lastDate: DateTime(2100),
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: const ColorScheme.light(
+              primary: Colors.blue,
+              onPrimary: Colors.white,
+              onSurface: Colors.black,
+            ),
+            textButtonTheme: TextButtonThemeData(
+              style: TextButton.styleFrom(
+                foregroundColor: Colors.blue,
+              ),
+            ),
+          ),
+          child: child!,
+        );
+      },
+    );
+    
+    if (picked != null) {
+      setState(() {
+        _dueDate = picked;
+      });
+    }
+  }
+
+  void _clearDueDate() {
+    setState(() {
+      _dueDate = null;
+    });
   }
 
   Future<void> _saveTask() async {
@@ -49,12 +89,12 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
 
     try {
       if (widget.task == null) {
-        // Criar nova tarefa
         final newTask = Task(
           title: _titleController.text.trim(),
           description: _descriptionController.text.trim(),
           priority: _priority,
           completed: _completed,
+          dueDate: _dueDate,
         );
         await DatabaseService.instance.create(newTask);
         
@@ -68,12 +108,12 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
           );
         }
       } else {
-        // Atualizar tarefa existente
         final updatedTask = widget.task!.copyWith(
           title: _titleController.text.trim(),
           description: _descriptionController.text.trim(),
           priority: _priority,
           completed: _completed,
+          dueDate: _dueDate,
         );
         await DatabaseService.instance.update(updatedTask);
         
@@ -150,7 +190,6 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
                     
                     const SizedBox(height: 16),
                     
-                    // Campo de Descrição
                     TextFormField(
                       controller: _descriptionController,
                       decoration: const InputDecoration(
@@ -167,8 +206,8 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
                     
                     const SizedBox(height: 16),
                     
-                    // Dropdown de Prioridade
                     DropdownButtonFormField<String>(
+                      value: _priority,
                       decoration: const InputDecoration(
                         labelText: 'Prioridade',
                         prefixIcon: Icon(Icons.flag),
@@ -225,7 +264,6 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
                     
                     const SizedBox(height: 16),
                     
-                    // Switch de Completo
                     Card(
                       child: SwitchListTile(
                         title: const Text('Tarefa Completa'),
@@ -245,9 +283,81 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
                       ),
                     ),
                     
+                    const SizedBox(height: 16),
+
+                    Card(
+                      child: Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Data de Vencimento',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: OutlinedButton.icon(
+                                    onPressed: _selectDueDate,
+                                    icon: const Icon(Icons.calendar_today),
+                                    label: Text(
+                                      _dueDate != null 
+                                        ? 'Vence em: ${DateFormat('dd/MM/yyyy').format(_dueDate!)}'
+                                        : 'Definir data de vencimento',
+                                    ),
+                                    style: OutlinedButton.styleFrom(
+                                      alignment: Alignment.centerLeft,
+                                      padding: const EdgeInsets.all(16),
+                                    ),
+                                  ),
+                                ),
+                                if (_dueDate != null) ...[
+                                  const SizedBox(width: 8),
+                                  IconButton(
+                                    onPressed: _clearDueDate,
+                                    icon: const Icon(Icons.clear),
+                                    tooltip: 'Remover data',
+                                    color: Colors.red,
+                                  ),
+                                ],
+                              ],
+                            ),
+                            if (_dueDate != null && _dueDate!.isBefore(DateTime.now()) && !_completed) ...[
+                              const SizedBox(height: 8),
+                              Container(
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  color: Colors.red.shade50,
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(color: Colors.red.shade200),
+                                ),
+                                child: Row(
+                                  children: [
+                                    Icon(Icons.warning, color: Colors.red.shade600, size: 16),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      'Esta tarefa está vencida!',
+                                      style: TextStyle(
+                                        color: Colors.red.shade600,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                    ),
+                    
                     const SizedBox(height: 24),
                     
-                    // Botão Salvar
                     ElevatedButton.icon(
                       onPressed: _saveTask,
                       icon: const Icon(Icons.save),
@@ -264,7 +374,6 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
                     
                     const SizedBox(height: 8),
                     
-                    // Botão Cancelar
                     OutlinedButton.icon(
                       onPressed: () => Navigator.pop(context),
                       icon: const Icon(Icons.cancel),

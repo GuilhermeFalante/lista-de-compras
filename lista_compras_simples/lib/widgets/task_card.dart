@@ -55,6 +55,59 @@ class TaskCard extends StatelessWidget {
     }
   }
 
+  Widget _buildDueDateInfo() {
+    if (task.dueDate == null) return const SizedBox.shrink();
+    
+    // ignore: unused_local_variable
+    final now = DateTime.now();
+    final dueDate = task.dueDate!;
+    final isOverdue = task.isOverdue;
+    final isDueToday = task.isDueToday;
+    
+    Color dateColor;
+    IconData dateIcon;
+    String dateText;
+    
+    if (isOverdue) {
+      dateColor = Colors.red;
+      dateIcon = Icons.warning;
+      dateText = 'Vencida: ${DateFormat('dd/MM/yyyy').format(dueDate)}';
+    } else if (isDueToday) {
+      dateColor = Colors.orange;
+      dateIcon = Icons.today;
+      dateText = 'Vence hoje!';
+    } else {
+      dateColor = Colors.blue;
+      dateIcon = Icons.event;
+      dateText = 'Vence: ${DateFormat('dd/MM/yyyy').format(dueDate)}';
+    }
+    
+    return Container(
+      margin: const EdgeInsets.only(top: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: dateColor.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: dateColor.withOpacity(0.3)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(dateIcon, size: 14, color: dateColor),
+          const SizedBox(width: 4),
+          Text(
+            dateText,
+            style: TextStyle(
+              fontSize: 12,
+              color: dateColor,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final dateFormat = DateFormat('dd/MM/yyyy HH:mm');
@@ -184,6 +237,8 @@ class TaskCard extends StatelessWidget {
                         ),
                       ],
                     ),
+                    
+                    _buildDueDateInfo(),
                   ],
                 ),
               ),
