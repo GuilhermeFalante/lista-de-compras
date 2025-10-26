@@ -1441,14 +1441,14 @@ Grave mostrando:
 ### 3. Screenshots
 
 Tire prints de:
-- Tela principal com tarefas
-- Card de estatísticas
-- Formulário de nova tarefa
-- Formulário de edição
-- Dialog de confirmação
-- SnackBar de feedback
-- Estado vazio
-- Menu de filtros
+- Tela principal com tarefas X
+- Card de estatísticas X
+- Formulário de nova tarefa X
+- Formulário de edição X
+- Dialog de confirmação X
+- SnackBar de feedback X 
+- Estado vazio X
+- Menu de filtros X
 
 ### 4. Relatório Técnico (1 página)
 
